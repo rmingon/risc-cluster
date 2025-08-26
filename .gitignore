@@ -1,0 +1,162 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# KiCad
+# Backup files
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*.kicad_prl-bak
+*.sch-bak
+*-backups/
+*-cache.lib
+*-rescue.lib
+*-saved.lib
+*.dcm-bak
+*.lib-bak
+hardware/production
+
+# KiCad lock files
+*.lck
+~*.kicad_pcb.lck
+~*.kicad_sch.lck
+
+# KiCad temporary files
+fp-info-cache
+*.zip
+
+# KiCad production files (uncomment if you don't want to track these)
+# production/
+# *.zip
+# *.gerber
+# *.gbr
+# *.drl
+# *.pdf
+
+# C/C++ embedded development
+# Build directories
+build/
+obj/
+debug/
+release/
+Debug/
+Release/
+bin/
+dist/
+
+# Object files
+*.o
+*.obj
+*.ko
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.lss
+
+# Linker output
+*.ilk
+*.pdb
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+
+# Compiler-specific files
+*.gch
+*.pch
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+_deps
+
+# Eclipse CDT
+.metadata
+.project
+.cproject
+.settings/
+.buildpath
+
+# MRS (MounRiver Studio) files
+.mrs/
+*.mrs-workspace
+*.launch
+*.wvproj
+*.template
+
+# ARM/RISC-V toolchain
+*.axf
+*.d
+
+# Log files
+*.log
+
+# Temporary files
+*~
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Patch files
+*.patch
+*.diff
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# System generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

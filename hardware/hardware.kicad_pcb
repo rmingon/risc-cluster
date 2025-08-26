@@ -50655,15 +50655,15 @@
 			(uuid "7bd188bf-0e5b-4dd6-be7f-06db67934c12")
 		)
 		(embedded_fonts no)
-		(model "${KICAD8_3DMODEL_DIR}/Connector_RJ.3dshapes/RJ45_Hanrun_HR911105A_Horizontal.wrl"
+		(model "/Users/ronanmingon/Downloads/HR911105A--3DModel-STEP-56544.STEP"
 			(offset
-				(xyz 0 0 0)
+				(xyz 4.5 -3.5 1)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz 90 -180 -0)
 			)
 		)
 	)

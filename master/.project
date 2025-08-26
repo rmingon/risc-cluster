@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <projectDescription>
-  <name>master</name>
+  <name>DHCP</name>
   <comment/>
   <projects/>
   <buildSpec>
@@ -20,7 +20,33 @@
     <nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
     <nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
   </natures>
-  <linkedResources/>
+  <linkedResources>
+    <link>
+      <name>Core</name>
+      <type>2</type>
+      <location>PARENT-2-PROJECT_LOC/SRC/Core</location>
+    </link>
+    <link>
+      <name>Debug</name>
+      <type>2</type>
+      <location>PARENT-2-PROJECT_LOC/SRC/Debug</location>
+    </link>
+    <link>
+      <name>Peripheral</name>
+      <type>2</type>
+      <location>PARENT-2-PROJECT_LOC/SRC/Peripheral</location>
+    </link>
+    <link>
+      <name>Startup</name>
+      <type>2</type>
+      <location>PARENT-2-PROJECT_LOC/SRC/Startup</location>
+    </link>
+    <link>
+      <name>NetLib</name>
+      <type>2</type>
+      <location>PARENT-1-PROJECT_LOC/NetLib</location>
+    </link>
+  </linkedResources>
   <filteredResources>
     <filter>
       <name/>
