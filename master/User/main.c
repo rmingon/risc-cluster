@@ -322,6 +322,7 @@ int main(void)
     if( WCHNET_LIB_VER != WCHNET_GetVer()){
         printf("version error.\n");
     }
+    I2C_Config();
     WCHNET_GetMacAddr(MACAddr);                                           //get the chip MAC address
     printf("mac addr:");
     for(i = 0; i < 6; i++) 
