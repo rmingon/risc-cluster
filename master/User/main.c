@@ -30,6 +30,41 @@ u8 SocketId;
 u8 SocketRecvBuf[WCHNET_MAX_SOCKET_NUM][RECE_BUF_LEN];  //socket receive buffer
 u8 MyBuf[RECE_BUF_LEN];
 
+#define I2C_SPEED              100000
+#define I2C_SLAVE_ADDRESS      0x50
+#define I2C_MASTER_ADDRESS     0x30
+#define I2C_PAGE_SIZE          8
+
+void I2C_Config(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure = {0};
+    I2C_InitTypeDef  I2C_InitStructure = {0};
+    
+    /* Enable GPIOB, I2C2 and AFIO clocks */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
+    
+    /* Configure PB10 (SCL) and PB11 (SDA) as AF Open-Drain */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_OD;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+    
+    /* I2C configuration */
+    I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
+    I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
+    I2C_InitStructure.I2C_OwnAddress1 = I2C_MASTER_ADDRESS;
+    I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
+    I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+    I2C_InitStructure.I2C_ClockSpeed = I2C_SPEED;
+    
+    /* Initialize I2C */
+    I2C_Init(I2C2, &I2C_InitStructure);
+    
+    /* Enable I2C */
+    I2C_Cmd(I2C2, ENABLE);
+}
+
 /*********************************************************************
  * @fn      mStopIfError
  *
