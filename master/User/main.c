@@ -31,9 +31,9 @@ u8 SocketRecvBuf[WCHNET_MAX_SOCKET_NUM][RECE_BUF_LEN];  //socket receive buffer
 u8 MyBuf[RECE_BUF_LEN];
 
 #define I2C_SPEED              100000
-#define I2C_SLAVE_ADDRESS      0x50
-#define I2C_MASTER_ADDRESS     0x30
+#define I2C_MASTER_ADDRESS     0x3F
 #define I2C_PAGE_SIZE          8
+#define I2C_TIMEOUT            0x1000
 
 void I2C_Config(void)
 {
@@ -301,6 +301,41 @@ u8 WCHNET_DHCPCallBack(u8 status, void *arg)
     }
 }
 
+uint8_t I2C_CheckDevice(uint8_t slaveAddr)
+{
+    uint32_t timeout = I2C_TIMEOUT;
+    uint8_t status = 0;
+    
+    while(I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY) && timeout--);
+    if(timeout == 0) return 1;
+    
+    I2C_GenerateSTART(I2C2, ENABLE);
+    
+    timeout = I2C_TIMEOUT;
+    while(!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT) && timeout--);
+    if(timeout == 0) return 1;
+    
+    I2C_Send7bitAddress(I2C2, slaveAddr << 1, I2C_Direction_Transmitter);
+    
+    timeout = I2C_TIMEOUT;
+    while(!I2C_GetFlagStatus(I2C2, I2C_FLAG_ADDR) && timeout--)
+    {
+        if(I2C_GetFlagStatus(I2C2, I2C_FLAG_AF))
+        {
+            /* No ACK received - device not present */
+            I2C_ClearFlag(I2C2, I2C_FLAG_AF);
+            status = 1;
+            break;
+        }
+    }
+    
+    if(timeout == 0) status = 1;
+    
+    I2C_GenerateSTOP(I2C2, ENABLE);
+    
+    return status;
+}
+
 /*********************************************************************
  * @fn      main
  *
@@ -311,10 +346,24 @@ u8 WCHNET_DHCPCallBack(u8 status, void *arg)
 int main(void)
 {
     u8 i;
+    uint8_t led_state = 0;
+    uint32_t blink_counter = 0;
+    uint32_t blink_interval = 10;
 
     SystemCoreClockUpdate();
     Delay_Init();
     USART_Printf_Init(115200);                                            //USART initialize
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+
+    GPIO_InitTypeDef gpio = {0};
+    gpio.GPIO_Pin   = GPIO_Pin_12;
+    gpio.GPIO_Mode  = GPIO_Mode_AF_OD;   // push-pull output
+    gpio.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_Init(GPIOB, &gpio);
+
+    GPIO_SetBits(GPIOB, GPIO_Pin_12);      // OFF (sink config: high = off)
+
     printf("DHCP Test\r\n");  	
     printf("SystemClk:%d\r\n", SystemCoreClock);
     printf("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
@@ -336,6 +385,18 @@ int main(void)
         printf("WCHNET_LibInit Success\r\n");
     WCHNET_DHCPStart(WCHNET_DHCPCallBack);                                //Start DHCP
 
+    printf("\r\nScanning I2C bus...\r\n");
+    uint8_t slaveCount= 0;
+    for(i = 0x10; i < 0x78; i++)
+    {
+        if(I2C_CheckDevice(i) == 0)
+        {
+            printf("Device found at address: 0x%02X\r\n", i);
+            slaveCount++;
+        }
+    }
+    printf("Total devices found: %d\r\n", slaveCount);
+
     while(1)
     {
         /*Ethernet library main task function,
@@ -347,5 +408,23 @@ int main(void)
         {
             WCHNET_HandleGlobalInt();
         }
+
+                blink_counter++;
+        if(blink_counter >= blink_interval)
+        {
+            blink_counter = 0;
+            led_state = !led_state;
+            
+            /* In sink mode: LOW = LED ON, HIGH = LED OFF */
+            if(led_state)
+            {
+                GPIO_ResetBits(GPIOB, GPIO_Pin_12);  // Pull low - LED ON
+            }
+            else
+            {
+                GPIO_SetBits(GPIOB, GPIO_Pin_12);    // Release high - LED OFF
+            }
+        }
+        
     }
 }

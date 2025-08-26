@@ -10,7 +10,6 @@
 	],
 	"settings": {
 		"mrs.workspace.type": "project",
-		"mrs.init.arg": "",
 		"files.associations": {
 			"*.c": "c",
 			"*.h": "cpp",

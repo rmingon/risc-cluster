@@ -20,7 +20,7 @@
 
 #include "debug.h"
 
-#define I2C_SLAVE_ADDRESS      0x50
+#define I2C_SLAVE_ADDRESS      0x10
 #define I2C_BUFFER_SIZE        128 
 
 typedef enum {
@@ -234,6 +234,8 @@ int main(void)
 {
     uint8_t i;
     uint8_t led_state = 0;
+    uint32_t blink_counter = 0;
+    uint32_t blink_interval = 10;
     
     /* Initialize system */
     SystemCoreClockUpdate();
@@ -253,15 +255,37 @@ int main(void)
     i2c_registers[0x02] = 0x10;  // Version high
     i2c_registers[0x03] = 0x01;  // Version low
     
-    GPIO_InitTypeDef GPIO_InitStructure = {0};
+
     RCC_PB2PeriphClockCmd(RCC_PB2Periph_GPIOD, ENABLE);
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_30MHz;
-    GPIO_Init(GPIOD, &GPIO_InitStructure);
+
+    GPIO_InitTypeDef gpio = {0};
+    gpio.GPIO_Pin   = GPIO_Pin_3;
+    gpio.GPIO_Mode  = GPIO_Mode_AF_OD;   // push-pull output
+    gpio.GPIO_Speed = GPIO_Speed_30MHz;
+    GPIO_Init(GPIOD, &gpio);
+
+    GPIO_SetBits(GPIOD, GPIO_Pin_3);      // OFF (sink config: high = off)
     
     while(1)
     {
+
+        blink_counter++;
+        if(blink_counter >= blink_interval)
+        {
+            blink_counter = 0;
+            led_state = !led_state;
+            
+            /* In sink mode: LOW = LED ON, HIGH = LED OFF */
+            if(led_state)
+            {
+                GPIO_ResetBits(GPIOD, GPIO_Pin_3);  // Pull low - LED ON
+            }
+            else
+            {
+                GPIO_SetBits(GPIOD, GPIO_Pin_3);    // Release high - LED OFF
+            }
+        }
+        
         if(i2c_rx_complete)
         {
             i2c_rx_complete = 0;
