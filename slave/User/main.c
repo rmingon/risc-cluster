@@ -28,6 +28,7 @@ volatile uint8_t i2c_reg_addr = 0;
 volatile I2C_State_t i2c_state = I2C_STATE_IDLE;
 volatile uint8_t i2c_rx_complete = 0;
 volatile uint8_t i2c_tx_complete = 0;
+volatile uint8_t  i2c_have_reg = 0;
 
 // Function prototypes
 void Application_Init(void);
@@ -36,13 +37,6 @@ void I2C_ProcessCommand(void);
 void Application_Task(void);
 void Jump_To_Bootloader(void);
 
-/*********************************************************************
- * @fn      Application_Init
- *
- * @brief   Initialize main application
- *
- * @return  none
- */
 void Application_Init(void)
 {
     SystemCoreClockUpdate();
@@ -119,94 +113,60 @@ void I2C_Slave_Config(void)
 void I2C1_EV_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void I2C1_EV_IRQHandler(void)
 {
-    uint32_t event = I2C_GetLastEvent(I2C1);
-    
-    switch(event)
-    {
-        case I2C_EVENT_SLAVE_RECEIVER_ADDRESS_MATCHED:
-            i2c_state = I2C_STATE_ADDR_MATCH;
-            break;
-            
-        case I2C_EVENT_SLAVE_BYTE_RECEIVED:
-            if(i2c_state == I2C_STATE_ADDR_MATCH)
-            {
-                i2c_reg_addr = I2C_ReceiveData(I2C1);
-                i2c_state = I2C_STATE_RX_DATA;
-            }
-            else if(i2c_state == I2C_STATE_RX_DATA)
-            {
-                if(i2c_reg_addr < I2C_BUFFER_SIZE)
-                {
-                    i2c_registers[i2c_reg_addr] = I2C_ReceiveData(I2C1);
-                    i2c_reg_addr++;
-                }
-                else
-                {
-                    I2C_ReceiveData(I2C1); // Discard data
-                }
-            }
-            break;
-            
-        case I2C_EVENT_SLAVE_TRANSMITTER_ADDRESS_MATCHED:
-            i2c_state = I2C_STATE_TX_DATA;
-            if(i2c_reg_addr < I2C_BUFFER_SIZE)
-            {
-                I2C_SendData(I2C1, i2c_registers[i2c_reg_addr]);
-                i2c_reg_addr++;
-            }
-            else
-            {
-                I2C_SendData(I2C1, 0xFF);
-            }
-            break;
-            
-        case I2C_EVENT_SLAVE_BYTE_TRANSMITTED:
-            if(i2c_reg_addr < I2C_BUFFER_SIZE)
-            {
-                I2C_SendData(I2C1, i2c_registers[i2c_reg_addr]);
-                i2c_reg_addr++;
-            }
-            else
-            {
-                I2C_SendData(I2C1, 0xFF);
-            }
-            break;
-            
-        case I2C_EVENT_SLAVE_STOP_DETECTED:
-            if(i2c_state == I2C_STATE_RX_DATA)
-            {
-                i2c_rx_complete = 1;
-            }
-            else if(i2c_state == I2C_STATE_TX_DATA)
-            {
-                i2c_tx_complete = 1;
-            }
-            i2c_state = I2C_STATE_IDLE;
-            I2C_ClearFlag(I2C1, I2C_FLAG_STOPF);
-            break;
+    // ---- Address matched (ADDR) ----
+    if (I2C_GetFlagStatus(I2C1, I2C_FLAG_ADDR) != RESET) {
+        (void)I2C1->STAR1;          // Read SR1
+        (void)I2C1->STAR2;          // Then SR2 to clear ADDR
+        i2c_have_reg = 0;           // Next RX byte will be the register index
+        // Direction is in SR2.TRA: 0=Rx, 1=Tx (if you need branching here)
+    }
+
+    // ---- Byte received (RXNE) ----
+    if (I2C_GetFlagStatus(I2C1, I2C_FLAG_RXNE) != RESET) {
+        uint8_t b = I2C_ReceiveData(I2C1);
+        if (!i2c_have_reg) {
+            i2c_reg_addr = b;
+            i2c_have_reg = 1;
+        } else {
+            if (i2c_reg_addr < I2C_BUFFER_SIZE) {
+                i2c_registers[i2c_reg_addr++] = b;
+            } // else: silently drop
+        }
+    }
+
+    // ---- Transmit buffer empty (TXE) ----
+    if (I2C_GetFlagStatus(I2C1, I2C_FLAG_TXE) != RESET) {
+        uint8_t b = 0xFF;
+        if (i2c_reg_addr < I2C_BUFFER_SIZE) {
+            b = i2c_registers[i2c_reg_addr++];
+        }
+        I2C_SendData(I2C1, b);
+    }
+
+    // ---- STOP detected (STOPF) ----
+    if (I2C_GetFlagStatus(I2C1, I2C_FLAG_STOPF) != RESET) {
+        // Clear STOPF: read SR1 then write CR1 (CTLR1 on WCH)
+        (void)I2C1->STAR1;
+        I2C1->CTLR1 |= I2C_CTLR1_PE;   // re-write PE bit
+
+        // Mark which path completed
+        // If we received at least the register index, treat as RX done
+        if (i2c_have_reg) {
+            i2c_rx_complete = 1;
+        } else {
+            i2c_tx_complete = 1;
+        }
+
+        i2c_have_reg = 0; // reset for next transaction
     }
 }
 
 void I2C1_ER_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void I2C1_ER_IRQHandler(void)
 {
-    if(I2C_GetITStatus(I2C1, I2C_IT_AF))
-    {
-        I2C_ClearITPendingBit(I2C1, I2C_IT_AF);
-        i2c_state = I2C_STATE_IDLE;
-    }
-    
-    if(I2C_GetITStatus(I2C1, I2C_IT_BERR))
-    {
-        I2C_ClearITPendingBit(I2C1, I2C_IT_BERR);
-        i2c_state = I2C_STATE_IDLE;
-    }
-    
-    if(I2C_GetITStatus(I2C1, I2C_IT_OVR))
-    {
-        I2C_ClearITPendingBit(I2C1, I2C_IT_OVR);
-        i2c_state = I2C_STATE_IDLE;
-    }
+    if (I2C_GetITStatus(I2C1, I2C_IT_AF))  { I2C_ClearITPendingBit(I2C1, I2C_IT_AF); }
+    if (I2C_GetITStatus(I2C1, I2C_IT_BERR)){ I2C_ClearITPendingBit(I2C1, I2C_IT_BERR); }
+    if (I2C_GetITStatus(I2C1, I2C_IT_OVR)) { I2C_ClearITPendingBit(I2C1, I2C_IT_OVR); }
 }
 
 void Jump_To_Bootloader(void)
@@ -329,7 +289,7 @@ void Application_Task(void)
         if(led_state)
         {
             GPIO_ResetBits(GPIOD, GPIO_Pin_3);  // LED ON
-            Delay_Ms(50);
+            Delay_Ms(100);
             GPIO_SetBits(GPIOD, GPIO_Pin_3);    // LED OFF
         }
         
@@ -381,7 +341,7 @@ int main(void)
             printf("I2C data transmitted\r\n");
         }
         
-        Application_Task();
+        // Application_Task();
         
         Delay_Ms(10);
     }

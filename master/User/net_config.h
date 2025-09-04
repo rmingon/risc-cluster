@@ -20,11 +20,11 @@ extern "C" {
 /*********************************************************************
  * socket configuration, IPRAW + UDP + TCP + TCP_LISTEN = number of sockets
  */
-#define WCHNET_NUM_IPRAW              0  /* Number of IPRAW connections */
+#define WCHNET_NUM_IPRAW              1  /* Number of IPRAW connections */
 
 #define WCHNET_NUM_UDP                1  /* The number of UDP connections */
 
-#define WCHNET_NUM_TCP                1  /* Number of TCP connections */
+#define WCHNET_NUM_TCP                0  /* Number of TCP connections */
 
 #define WCHNET_NUM_TCP_LISTEN         0  /* Number of TCP listening */
 
@@ -87,7 +87,8 @@ extern "C" {
 
 #define WCHNET_NUM_TCP_SEG            (WCHNET_NUM_TCP*2)   /* The number of TCP segments used to send */
 
-#define WCHNET_MEM_HEAP_SIZE          (((WCHNET_TCP_MSS+0x10+54+8)*WCHNET_NUM_TCP_SEG)+ETH_TX_BUF_SZE+64+2*0x18) /* memory heap size */
+#define WCHNET_MEM_HEAP_SIZE    (16 * 1024)
+// #define WCHNET_MEM_HEAP_SIZE          (((WCHNET_TCP_MSS+0x10+54+8)*WCHNET_NUM_TCP_SEG)+ETH_TX_BUF_SZE+64+2*0x18) /* memory heap size */
 
 #define WCHNET_NUM_ARP_TABLE          50   /* Number of ARP lists */
 
