@@ -26,9 +26,13 @@ u8 DESIP[4]    = {192, 168, 1, 100};              //destination IP address
 u16 desport = 1000;                               //destination port
 u16 srcport = 1000;                               //source port
 
+#define UDP_RECE_BUF_LEN 512
 u8 SocketId;
-u8 SocketRecvBuf[WCHNET_MAX_SOCKET_NUM][RECE_BUF_LEN];  //socket receive buffer
-u8 MyBuf[RECE_BUF_LEN];
+u8 SocketRecvBuf[WCHNET_MAX_SOCKET_NUM][UDP_RECE_BUF_LEN]; // socket receive buffer
+u8 MyBuf[UDP_RECE_BUF_LEN];
+
+volatile uint32_t g_ms = 0;
+static inline uint32_t millis(void) { return g_ms; }
 
 #define I2C_SPEED              100000
 #define I2C_MASTER_ADDRESS     0x3F
@@ -108,31 +112,6 @@ void TIM2_Init(void)
 }
 
 /*********************************************************************
- * @fn      WCHNET_CreateTcpSocket
- *
- * @brief   Create TCP Socket
- *
- * @return  none
- */
-void WCHNET_CreateTcpSocket(void)
-{
-    u8 i;
-    SOCK_INF TmpSocketInf;
-
-    memset((void *) &TmpSocketInf, 0, sizeof(SOCK_INF));
-    memcpy((void *) TmpSocketInf.IPAddr, DESIP, 4);
-    TmpSocketInf.DesPort = desport;
-    TmpSocketInf.SourPort = srcport++;
-    TmpSocketInf.ProtoType = PROTO_TYPE_TCP;
-    TmpSocketInf.RecvBufLen = RECE_BUF_LEN;
-    i = WCHNET_SocketCreat(&SocketId, &TmpSocketInf);
-    printf("SocketId %d\r\n", SocketId);
-    mStopIfError(i);
-    i = WCHNET_SocketConnect(SocketId);                        //make a TCP connection
-    mStopIfError(i);
-}
-
-/*********************************************************************
  * @fn      WCHNET_DataLoopback
  *
  * @brief   Data loopback function.
@@ -163,6 +142,7 @@ void WCHNET_DataLoopback(u8 id)
     u8 *p = MyBuf;
 
     len = WCHNET_SocketRecvLen(id, NULL);                                //query length
+    printf("Receive Len = %02x\n", len);
     totallen = len;
     WCHNET_SocketRecv(id, MyBuf, &len);                                  //Read the data of the receive buffer into MyBuf
     while(1){
@@ -188,23 +168,21 @@ void WCHNET_DataLoopback(u8 id)
  */
 void WCHNET_HandleSockInt(u8 socketid, u8 intstat)
 {
-    if (intstat & SINT_STAT_RECV)                               //receive data
+    if (intstat & SINT_STAT_RECV) // receive data
     {
-        WCHNET_DataLoopback(socketid);                          //Data loopback
+        WCHNET_DataLoopback(socketid); // Data loopback
     }
-    if (intstat & SINT_STAT_CONNECT)                            //connect successfully
+    if (intstat & SINT_STAT_CONNECT) // connect successfully
     {
-        WCHNET_ModifyRecvBuf(socketid, (u32) SocketRecvBuf[socketid], RECE_BUF_LEN);
         printf("TCP Connect Success\r\n");
     }
-    if (intstat & SINT_STAT_DISCONNECT)                         //disconnect
+    if (intstat & SINT_STAT_DISCONNECT) // disconnect
     {
         printf("TCP Disconnect\r\n");
     }
-    if (intstat & SINT_STAT_TIM_OUT)                            //timeout disconnect
+    if (intstat & SINT_STAT_TIM_OUT) // timeout disconnect
     {
         printf("TCP Timeout\r\n");
-        WCHNET_CreateTcpSocket();
     }
 }
 
@@ -221,28 +199,47 @@ void WCHNET_HandleGlobalInt(void)
     u16 i;
     u8 socketint;
 
-    intstat = WCHNET_GetGlobalInt();                              //get global interrupt flag
-    if (intstat & GINT_STAT_UNREACH)                              //Unreachable interrupt
+    intstat = WCHNET_GetGlobalInt(); // get global interrupt flag
+    if (intstat & GINT_STAT_UNREACH) // Unreachable interrupt
     {
         printf("GINT_STAT_UNREACH\r\n");
     }
-    if (intstat & GINT_STAT_IP_CONFLI)                            //IP conflict
+    if (intstat & GINT_STAT_IP_CONFLI) // IP conflict
     {
         printf("GINT_STAT_IP_CONFLI\r\n");
     }
-    if (intstat & GINT_STAT_PHY_CHANGE)                           //PHY status change
+    if (intstat & GINT_STAT_PHY_CHANGE) // PHY status change
     {
         i = WCHNET_GetPHYStatus();
         if (i & PHY_Linked_Status)
             printf("PHY Link Success\r\n");
     }
-    if (intstat & GINT_STAT_SOCKET) {                             //socket related interrupt
-        for (i = 0; i < WCHNET_MAX_SOCKET_NUM; i++) {
+    if (intstat & GINT_STAT_SOCKET)
+    {
+        for (i = 0; i < WCHNET_MAX_SOCKET_NUM; i++)
+        { // socket related interrupt
             socketint = WCHNET_GetSocketInt(i);
             if (socketint)
                 WCHNET_HandleSockInt(i, socketint);
         }
     }
+}
+
+void WCHNET_CreateUdpSocket(void)
+{
+    u8 i;
+    SOCK_INF TmpSocketInf;
+
+    memset((void *) &TmpSocketInf, 0, sizeof(SOCK_INF));
+    memcpy((void *) TmpSocketInf.IPAddr, DESIP, 4);
+    TmpSocketInf.DesPort = desport;
+    TmpSocketInf.SourPort = srcport++;
+    TmpSocketInf.ProtoType = PROTO_TYPE_UDP;
+    TmpSocketInf.RecvBufLen = UDP_RECE_BUF_LEN;
+    i = WCHNET_SocketCreat(&SocketId, &TmpSocketInf);
+    printf("SocketId %d\r\n", SocketId);
+    WCHNET_ModifyRecvBuf(SocketId, (u32) SocketRecvBuf[SocketId], UDP_RECE_BUF_LEN);
+    mStopIfError(i);
 }
 
 /*********************************************************************
@@ -260,7 +257,7 @@ void WCHNET_HandleGlobalInt(void)
 u8 WCHNET_DHCPCallBack(u8 status, void *arg)
 {
     u8 *p;
-    u8 tmp[4] = {0, 0, 0, 0};
+    
 
     if(!status)
     {
@@ -269,12 +266,6 @@ u8 WCHNET_DHCPCallBack(u8 status, void *arg)
         /*If the obtained IP is the same as the last IP, exit this function.*/
         if(!memcmp(IPAddr, p ,sizeof(IPAddr)))
             return READY;
-        /*Determine whether it is the first successful IP acquisition*/
-        if(memcmp(IPAddr, tmp ,sizeof(IPAddr))){
-            /*The obtained IP is different from the last value,
-             * then disconnect the last connection.*/
-            WCHNET_SocketClose(SocketId, TCP_CLOSE_NORMAL);
-        }
         memcpy(IPAddr, p, 4);
         memcpy(GWIPAddr, &p[4], 4);
         memcpy(IPMask, &p[8], 4);
@@ -286,19 +277,60 @@ u8 WCHNET_DHCPCallBack(u8 status, void *arg)
                (u16)IPMask[2], (u16)IPMask[3]);
         printf("DNS1: %d.%d.%d.%d \r\n", p[12], p[13], p[14], p[15]);
         printf("DNS2: %d.%d.%d.%d \r\n", p[16], p[17], p[18], p[19]);
-        WCHNET_CreateTcpSocket();                                                   //Create a TCP connection
+        WCHNET_CreateUdpSocket(); // Create UDP Socket
         return READY;
     }
     else
     {
         printf("DHCP Fail %02x \r\n", status);
-        /*Determine whether it is the first successful IP acquisition*/
-        if(memcmp(IPAddr, tmp ,sizeof(IPAddr))){
-            /*The obtained IP is different from the last value*/
-            WCHNET_SocketClose(SocketId, TCP_CLOSE_NORMAL);
-        }
         return NoREADY;
     }
+}
+
+int I2C_WriteRegs(uint8_t addr7, uint8_t reg, const uint8_t *data, uint16_t len)
+{
+    uint32_t to;
+
+    // Wait bus free
+    to = I2C_TIMEOUT;
+    while (I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY) && --to);
+    if (to == 0) goto err;
+
+    // START
+    I2C_GenerateSTART(I2C2, ENABLE);
+    to = I2C_TIMEOUT;
+    while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT) && --to);
+    if (to == 0) goto err;
+
+    // Address (write)
+    I2C_Send7bitAddress(I2C2, (addr7 << 1), I2C_Direction_Transmitter);
+    to = I2C_TIMEOUT;
+    while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED) && --to) {
+        if (I2C_GetFlagStatus(I2C2, I2C_FLAG_AF)) { I2C_ClearFlag(I2C2, I2C_FLAG_AF); goto err; }
+    }
+    if (to == 0) goto err;
+
+    // Send starting register
+    I2C_SendData(I2C2, reg);
+    to = I2C_TIMEOUT;
+    while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTING) && --to);
+    if (to == 0) goto err;
+
+    // Payload
+    for (uint16_t i = 0; i < len; i++) {
+        I2C_SendData(I2C2, data[i]);
+        to = I2C_TIMEOUT;
+        while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTING) && --to);
+        if (to == 0) goto err;
+    }
+
+    // STOP
+    I2C_GenerateSTOP(I2C2, ENABLE);
+    return 0;
+
+err:
+    I2C_GenerateSTOP(I2C2, ENABLE);
+    return -1;
 }
 
 uint8_t I2C_CheckDevice(uint8_t slaveAddr)
@@ -336,6 +368,50 @@ uint8_t I2C_CheckDevice(uint8_t slaveAddr)
     return status;
 }
 
+static inline int SysTick_Config(uint32_t ticks)
+{
+    if (ticks - 1 > 0xFFFFFF) return -1; // Reload value too big
+
+    SysTick->CTLR = 0;          // disable
+    SysTick->SR   = 0;          // clear count flag
+    SysTick->CMP  = ticks - 1;  // reload value
+    SysTick->CNT  = 0;
+    SysTick->CTLR = 0xF;        // enable counter + interrupt
+    return 0;
+}
+
+void TIM3_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void TIM3_IRQHandler(void)
+{
+    if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET) {
+        TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
+        g_ms++;
+    }
+}
+
+void TIM3_Init_1ms(void)
+{
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+
+    TIM_TimeBaseInitTypeDef tb = {0};
+    uint32_t pclk = SystemCoreClock;          // check APB prescaler if any
+    uint16_t presc = (pclk / 1000000) - 1;    // 1 MHz timer clock
+    uint16_t period = 1000 - 1;               // 1000 ticks @1MHz = 1ms
+
+    tb.TIM_Prescaler     = presc;
+    tb.TIM_Period        = period;
+    tb.TIM_CounterMode   = TIM_CounterMode_Up;
+    tb.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseInit(TIM3, &tb);
+
+    TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
+    TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
+
+    NVIC_EnableIRQ(TIM3_IRQn);
+
+    TIM_Cmd(TIM3, ENABLE);
+}
+
 /*********************************************************************
  * @fn      main
  *
@@ -345,12 +421,16 @@ uint8_t I2C_CheckDevice(uint8_t slaveAddr)
  */
 int main(void)
 {
+
     u8 i;
     uint8_t led_state = 0;
     uint32_t blink_counter = 0;
     uint32_t blink_interval = 10;
 
     SystemCoreClockUpdate();
+    TIM3_Init_1ms();
+    __enable_irq();   // make sure global interrupts are on
+    SysTick_Config(SystemCoreClock / 1000);
     Delay_Init();
     USART_Printf_Init(115200);                                            //USART initialize
 
@@ -383,19 +463,23 @@ int main(void)
     mStopIfError(i);
     if(i == WCHNET_ERR_SUCCESS)
         printf("WCHNET_LibInit Success\r\n");
+
     WCHNET_DHCPStart(WCHNET_DHCPCallBack);                                //Start DHCP
 
     printf("\r\nScanning I2C bus...\r\n");
+
+    uint8_t slaves[32] = {};
     uint8_t slaveCount= 0;
     for(i = 0x10; i < 0x78; i++)
     {
         if(I2C_CheckDevice(i) == 0)
         {
             printf("Device found at address: 0x%02X\r\n", i);
-            slaveCount++;
+            if (slaveCount < sizeof(slaves)) slaves[slaveCount++] = i;
         }
     }
     printf("Total devices found: %d\r\n", slaveCount);
+    uint32_t last_blink_cmd_ms = 0;
 
     while(1)
     {
@@ -409,7 +493,38 @@ int main(void)
             WCHNET_HandleGlobalInt();
         }
 
-                blink_counter++;
+        if (millis() - last_blink_cmd_ms >= 2000) {
+            last_blink_cmd_ms += 2000;
+            
+            for (uint8_t i = 0; i < slaveCount; i++) {
+                uint8_t addr = slaves[i];
+
+                printf("I2C: send CMD to 0x%02X\r\n", addr);
+
+                // Write CMD (0x52) to reg 0x00
+                uint8_t cmd = 0x52;
+                if (I2C_WriteRegs(addr, 0x00, &cmd, 1) != 0) {
+                    printf("I2C: failed to send CMD to 0x%02X\r\n", addr);
+                    continue;
+                }
+
+                // Write blink_count (1) to reg 0x10
+                uint8_t count = 1;
+                if (I2C_WriteRegs(addr, 0x10, &count, 1) != 0) {
+                    printf("I2C: failed to send count to 0x%02X\r\n", addr);
+                    continue;
+                }
+
+                // (Optional) small settle if some slaves need it:
+                Delay_Ms(100);
+
+                // Done — each slave will do one 200 ms ON + 200 ms OFF
+                // (per your slave's 0x52 handler)
+            }
+        }
+
+
+        blink_counter++;
         if(blink_counter >= blink_interval)
         {
             blink_counter = 0;
