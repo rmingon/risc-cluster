@@ -2,6 +2,8 @@
 
 A distributed computing cluster based on CH32V RISC-V microcontrollers with Ethernet connectivity.
 
+![REAL WORK](./gif.gif)
+
 ## Overview
 
 This project implements a cluster computing system using multiple CH32V microcontrollers connected via Ethernet. The system features a master controller (CH32V307RCT6) that coordinates with multiple worker nodes (CH32V003F4P6) to form a distributed computing network.
