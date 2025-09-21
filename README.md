@@ -2,6 +2,10 @@
 
 A distributed computing cluster based on CH32V RISC-V microcontrollers with Ethernet connectivity.
 
+[HACKADAY](https://hackaday.io/project/204036-13ghz-for-only-10-bucks)
+
+[TINDIE](https://www.tindie.com/products/rmingon/risc-v-cluster-13ghz-combined/)
+
 ![REAL WORK](./gif.gif)
 
 ## Overview
@@ -121,3 +125,4 @@ This is a hardware-software co-design project. Contributions welcome for:
 - Hardware design improvements
 - Cluster algorithms implementation
 - Documentation and examples
+
